@@ -584,48 +584,53 @@ eu:
   Instrumental: Instrumentala
   Vocals: Ahotsak
   BGM Separation: BGM Bereizpena
-he: # Hebrew
+he:
   Language: שפה
-  File: קובץ
-  Youtube: יוטיוב
-  Mic: מיקרופון
-  T2T Translation: תרגום T2T
-  BGM Separation: הפרדת מוזיקת רקע
-  GENERATE SUBTITLE FILE: צור קובץ כתוביות
-  Output: פלט
-  Downloadable output file: קובץ פלט להורדה
   Upload File here: העלה קובץ כאן
   Model: מודל
   Automatic Detection: זיהוי אוטומטי
   File Format: פורמט קובץ
   Translate to English?: לתרגם לאנגלית?
   Add a timestamp to the end of the filename: הוסף חותמת זמן לסוף שם הקובץ
-  Advanced Parameters: פרמטרים מתקדמים
-  Background Music Remover Filter: מסנן הסרת מוזיקת רקע
-  Enabling this will remove background music: הפעלה תסיר מוזיקת רקע באמצעות מודל משנה לפני תמלול
-  Enable Background Music Remover Filter: אפשר מסנן הסרת מוזיקת רקע
-  Save separated files to output: שמור קבצים מופרדים לפלט
   Offload sub model when finished: נתק מודל משנה לאחר סיום
-  Voice Detection Filter: מסנן זיהוי קול
-  Enable this to transcribe only detected voice: אפשר זאת כדי לתמלל רק קטעי קול שזוהו על ידי מודל המשנה
-  Enable Silero VAD Filter: אפשר מסנן Silero VAD
-  Diarization: דיאריזציה (זיהוי דוברים)
-  Enable Diarization: אפשר דיאריזציה
-  HuggingFace Token: אסימון HuggingFace
-  This is only needed the first time you download the model: זה נדרש רק בפעם הראשונה שאתה מוריד את המודל. אם כבר יש לך את המודלים, אין צורך להזין זאת
+  Advanced Parameters: פרמטרים מתקדמים
+  Enabling this will remove background music: הפעלה תסיר מוזיקת רקע באמצעות מודל משנה
+    לפני תמלול
+  Enable Background Music Remover Filter: אפשר מסנן הסרת מוזיקת רקע
   Device: התקן
+  Save separated files to output: שמור קבצים מופרדים לפלט
+  Background Music Remover Filter: מסנן הסרת מוזיקת רקע
+  Enable this to transcribe only detected voice: אפשר זאת כדי לתמלל רק קטעי קול שזוהו
+    על ידי מודל המשנה
+  Enable Silero VAD Filter: אפשר מסנן Silero VAD
+  Voice Detection Filter: מסנן זיהוי קול
+  Enable Diarization: אפשר דיאריזציה
+  This is only needed the first time you download the model: זה נדרש רק בפעם הראשונה
+    שאתה מוריד את המודל. אם כבר יש לך את המודלים, אין צורך להזין זאת
+  HuggingFace Token: אסימון HuggingFace
+  Diarization: דיאריזציה (זיהוי דוברים)
+  GENERATE SUBTITLE FILE: צור קובץ כתוביות
+  Output: פלט
+  Downloadable output file: קובץ פלט להורדה
+  File: קובץ
   Youtube Link: קישור יוטיוב
   Youtube Thumbnail: תמונת תצוגה מקדימה של יוטיוב
   Youtube Title: כותרת יוטיוב
   Youtube Description: תיאור יוטיוב
+  Youtube: יוטיוב
   Record with Mic: הקלט עם מיקרופון
+  Mic: מיקרופון
   Upload Subtitle Files to translate here: העלה כאן קבצי כתוביות לתרגום
   Your Auth Key (API KEY): מפתח אימות שלך (API KEY)
   Source Language: שפת מקור
   Target Language: שפת יעד
   Pro User?: משתמש פרו?
   TRANSLATE SUBTITLE FILE: תרגם קובץ כתוביות
+  DeepL API: DeepL API
+  NLLB: NLLB
+  T2T Translation: תרגום T2T
   Upload Audio Files to separate background music: העלה קבצי שמע להפרדת מוזיקת רקע
+  SEPARATE BACKGROUND MUSIC: הפרד מוזיקת רקע
   Instrumental: אינסטרומנטלי
   Vocals: שירה
-  SEPARATE BACKGROUND MUSIC: הפרד מוזיקת רקע
+  BGM Separation: הפרדת מוזיקת רקע
