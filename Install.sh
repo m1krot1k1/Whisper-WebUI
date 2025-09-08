@@ -1,27 +1,48 @@
 #!/bin/bash
 
+set -o errexit
+set -o pipefail
+set -o nounset
+
+# Allow continuing after non-critical failures in specific steps
+trap 'echo "[!] Script failed at line $LINENO"' ERR
+
+FORCE_CPU=${FORCE_CPU:-0}
+PYTHON_BIN=${PYTHON_BIN:-python3}
+INSTALLED_TORCH_TAG=""
+
+# Colored output helpers
+bold() { echo -e "\e[1m$*\e[0m"; }
+green() { echo -e "\e[32m$*\e[0m"; }
+yellow() { echo -e "\e[33m$*\e[0m"; }
+red() { echo -e "\e[31m$*\e[0m"; }
+
 # Function to create cuDNN compatibility symlinks
 create_cudnn_symlinks() {
     echo "Creating cuDNN compatibility symlinks..."
-    cd /usr/lib/x86_64-linux-gnu
-    
-    # Create symlinks for all cuDNN libraries
-    for lib in libcudnn.so libcudnn_adv.so libcudnn_ops.so libcudnn_heuristic.so libcudnn_engines_precompiled.so libcudnn_engines_runtime_compiled.so libcudnn_graph.so libcudnn_cnn.so; do
-        if [ -f "${lib}.9.13.0" ]; then
-            ln -sf ${lib}.9.13.0 ${lib}.9.1.0 2>/dev/null || true
-            ln -sf ${lib}.9.13.0 ${lib}.9.1 2>/dev/null || true
-            ln -sf ${lib}.9.13.0 ${lib}.9 2>/dev/null || true
-            echo "   ✅ Created symlinks for ${lib}"
-        elif [ -f "${lib}.8.9.7" ]; then
-            ln -sf ${lib}.8.9.7 ${lib}.9.1.0 2>/dev/null || true
-            ln -sf ${lib}.8.9.7 ${lib}.9.1 2>/dev/null || true
-            ln -sf ${lib}.8.9.7 ${lib}.9 2>/dev/null || true
-            echo "   ✅ Created symlinks for ${lib} (from 8.9.7)"
+    local cudnn_dir="/usr/lib/x86_64-linux-gnu"
+    if [ ! -d "$cudnn_dir" ]; then
+        yellow "   cuDNN directory not found: $cudnn_dir"
+        return 0
+    fi
+    pushd "$cudnn_dir" >/dev/null || return 0
+    # Libraries we care about
+    local libs=(libcudnn libcudnn_adv libcudnn_ops libcudnn_heuristic libcudnn_engines_precompiled libcudnn_engines_runtime_compiled libcudnn_graph libcudnn_cnn)
+    for base in "${libs[@]}"; do
+        # Find the highest version available (prefer 9.*, fallback to 8.*)
+        target=$(ls -1 ${base}.so.* 2>/dev/null | sort -V | grep -E '\.9\.' || true | tail -n1)
+        if [ -z "$target" ]; then
+            target=$(ls -1 ${base}.so.* 2>/dev/null | sort -V | tail -n1 || true)
+        fi
+        if [ -n "$target" ]; then
+            for linkver in 9.1.0 9.1 9; do
+                ln -sf "$target" "${base}.so.${linkver}" 2>/dev/null || true
+            done
+            echo "   ✅ ${base} -> $target (compat links)"
         fi
     done
-    
-    cd - > /dev/null
-    ldconfig
+    popd >/dev/null || true
+    ldconfig || true
     echo "Compatibility symlinks created."
 }
 
@@ -106,21 +127,93 @@ install_cudnn() {
     return 0
 }
 
-# Install cuDNN libraries (if possible)
-install_cudnn
+# Install cuDNN libraries (if possible & not forced CPU)
+if [ "$FORCE_CPU" != "1" ]; then
+  install_cudnn || true
+else
+  yellow "Skipping cuDNN install (FORCE_CPU=1)"
+fi
+
+
+# Check if python3 is installed
+if ! command -v python3 &>/dev/null; then
+    echo "Python3 is not installed. Installing..."
+    sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+fi
 
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
-    python -m venv venv
+    python3 -m venv venv
 fi
 
 source venv/bin/activate
 
-python -m pip install -U pip
+python -m pip install -U pip wheel setuptools
 
-# Install PyTorch with compatible cuDNN version first
-echo "Installing PyTorch with compatible cuDNN..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+PYTORCH_TAG="cpu"
+if [ "$FORCE_CPU" != "1" ] && command -v nvidia-smi &>/dev/null; then
+  DETECTED_CUDA=$(nvidia-smi | grep "CUDA Version" | sed 's/.*CUDA Version: \([0-9]*\.[0-9]*\).*/\1/' || echo "0.0")
+  case "$DETECTED_CUDA" in
+    13.*) PYTORCH_TAG="cu130" ;; # may not exist yet -> fallback logic below
+    12.*) PYTORCH_TAG="cu121" ;;
+    11.*) PYTORCH_TAG="cu118" ;;
+    *) PYTORCH_TAG="cpu" ;;
+  esac
+fi
+
+echo "Requested PyTorch CUDA tag: $PYTORCH_TAG"
+
+install_torch() {
+  local tag="$1"
+  if [ "$tag" = "cpu" ]; then
+     pip install --no-cache-dir torch torchvision torchaudio && return 0
+  else
+     pip install --no-cache-dir torch torchvision torchaudio --index-url "https://download.pytorch.org/whl/${tag}" && return 0
+  fi
+  return 1
+}
+
+# Attempt install with fallback sequence
+FALLBACKS=()
+if [ "$PYTORCH_TAG" = "cu130" ]; then
+  FALLBACKS=(cu130 cu121 cu118 cpu)
+elif [ "$PYTORCH_TAG" = "cu121" ]; then
+  FALLBACKS=(cu121 cu118 cpu)
+elif [ "$PYTORCH_TAG" = "cu118" ]; then
+  FALLBACKS=(cu118 cu121 cpu)
+else
+  FALLBACKS=(cpu)
+fi
+
+INSTALLED_TORCH_TAG=""
+for tag in "${FALLBACKS[@]}"; do
+  echo "Trying PyTorch build: $tag"
+  if install_torch "$tag"; then
+     INSTALLED_TORCH_TAG="$tag"
+     green "Installed PyTorch tag: $tag"
+     break
+  else
+     yellow "Failed to install tag $tag, trying next..."
+  fi
+done
+
+if [ -z "$INSTALLED_TORCH_TAG" ]; then
+  red "Failed to install any PyTorch build. Aborting."
+  deactivate || true
+  exit 1
+fi
+
+# Quick torch sanity test
+python - <<'PY'
+import torch, sys
+print('Torch version:', torch.__version__)
+print('Built with CUDA:', torch.version.cuda)
+print('CUDA available:', torch.cuda.is_available())
+if torch.cuda.is_available():
+    print('Device:', torch.cuda.get_device_name(0))
+print('cuDNN available:', torch.backends.cudnn.is_available())
+print('cuDNN version:', torch.backends.cudnn.version())
+PY
 
 # Install other requirements
 pip install -r requirements.txt && echo "Requirements installed successfully." || {
@@ -142,6 +235,10 @@ if find /usr -name "libcudnn_cnn.so*" 2>/dev/null | grep -q .; then
     echo "   ✅ cuDNN libraries available"
 else
     echo "   ⚠️  cuDNN libraries not installed (may cause errors)"
+fi
+echo "   ✅ PyTorch tag used: ${INSTALLED_TORCH_TAG}"
+if [ "$FORCE_CPU" = "1" ]; then
+  echo "   ℹ️  Forced CPU mode (FORCE_CPU=1)"
 fi
 echo ""
 echo "🚀 To run the application:"
