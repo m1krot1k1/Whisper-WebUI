@@ -16,9 +16,13 @@ from modules.utils.youtube_manager import get_ytmetas
 from modules.translation.deepl_api import DeepLAPI
 from modules.whisper.data_classes import *
 from modules.utils.logger import get_logger
+from modules.utils.env_loader import load_env_file
 
 
 logger = get_logger()
+
+# Load environment variables from .env file
+load_env_file()
 
 
 class App:

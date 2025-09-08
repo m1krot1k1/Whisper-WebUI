@@ -10,6 +10,7 @@ from modules.utils.paths import DIARIZATION_MODELS_DIR
 from modules.diarize.diarize_pipeline import DiarizationPipeline, assign_word_speakers
 from modules.diarize.audio_loader import load_audio
 from modules.whisper.data_classes import *
+from modules.utils.env_loader import load_env_file, get_hf_token
 
 
 class Diarizer:
@@ -106,19 +107,28 @@ class Diarizer:
 
         os.makedirs(self.model_dir, exist_ok=True)
 
-        if (not os.listdir(self.model_dir) and
-                not use_auth_token):
+        # Load environment variables from .env file
+        load_env_file()
+        
+        # Get token from parameter, environment, or .env file
+        token = use_auth_token or get_hf_token()
+        
+        if (not os.listdir(self.model_dir) and not token):
             print(
                 "\nFailed to diarize. You need huggingface token and agree to their requirements to download the diarization model.\n"
                 "Go to \"https://huggingface.co/pyannote/speaker-diarization-3.1\" and follow their instructions to download the model.\n"
+                "You can also set HF_TOKEN in your .env file or environment variables.\n"
             )
             return
+
+        if token:
+            print(f"Using Hugging Face token for diarization model download...")
 
         logger = logging.getLogger("speechbrain.utils.train_logger")
         # Disable redundant torchvision warning message
         logger.disabled = True
         self.pipe = DiarizationPipeline(
-            use_auth_token=use_auth_token,
+            use_auth_token=token,
             device=device,
             cache_dir=self.model_dir
         )

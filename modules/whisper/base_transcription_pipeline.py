@@ -190,9 +190,16 @@ class BaseTranscriptionPipeline(ABC):
 
         if diarization_params.is_diarize:
             progress(0.99, desc="Diarizing speakers..")
+            # Load environment variables and get HF token
+            from modules.utils.env_loader import load_env_file, get_hf_token
+            load_env_file()
+            
+            # Use token from UI, environment, or .env file
+            token = diarization_params.hf_token or get_hf_token()
+            
             result, elapsed_time_diarization = self.diarizer.run(
                 audio=origin_audio,
-                use_auth_token=diarization_params.hf_token if diarization_params.hf_token else os.environ.get("HF_TOKEN"),
+                use_auth_token=token,
                 transcribed_result=result,
                 device=diarization_params.diarization_device
             )
