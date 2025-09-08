@@ -17,6 +17,15 @@ green() { echo -e "\e[32m$*\e[0m"; }
 yellow() { echo -e "\e[33m$*\e[0m"; }
 red() { echo -e "\e[31m$*\e[0m"; }
 
+# Install system dependencies
+echo "Installing system dependencies..."
+if [ "$EUID" -eq 0 ]; then
+    apt update -qq && apt install -y ffmpeg
+else
+    sudo apt update -qq && sudo apt install -y ffmpeg
+fi
+echo "System dependencies installed."
+
 # Function to create cuDNN compatibility symlinks
 create_cudnn_symlinks() {
     echo "Creating cuDNN compatibility symlinks..."
