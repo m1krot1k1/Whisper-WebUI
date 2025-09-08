@@ -42,7 +42,7 @@ class DiarizationPipeline:
         return diarize_df
 
 
-def assign_word_speakers(diarize_df, transcript_result, fill_nearest=False):
+def assign_word_speakers(diarize_df, transcript_result, fill_nearest=True):
     transcript_segments = transcript_result["segments"]
     if transcript_segments and isinstance(transcript_segments[0], Segment):
         transcript_segments = [seg.model_dump() for seg in transcript_segments]

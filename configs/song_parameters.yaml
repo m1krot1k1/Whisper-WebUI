@@ -21,8 +21,8 @@ whisper:
   suppress_tokens: '[-1]'
   max_initial_timestamp: 1.0
   word_timestamps: true
-  prepend_punctuations: '"''“¿([{-'
-  append_punctuations: '"''.。,，!！?？:：”)]}、'
+  prepend_punctuations: '""¿([{-'
+  append_punctuations: '".。,，!！?？:：")]}、'
   max_new_tokens: null
   chunk_length: 60
   hallucination_silence_threshold: null
@@ -35,11 +35,11 @@ whisper:
   file_format: SRT
 vad:
   vad_filter: false
-  threshold: 0.5
-  min_speech_duration_ms: 250
+  threshold: 0.3
+  min_speech_duration_ms: 100
   max_speech_duration_s: 9999
-  min_silence_duration_ms: 2000
-  speech_pad_ms: 400
+  min_silence_duration_ms: 500
+  speech_pad_ms: 200
 diarization:
   is_diarize: true
   diarization_device: cuda
@@ -52,15 +52,3 @@ bgm_separation:
   segment_size: 256
   save_file: false
   enable_offload: true
-translation:
-  deepl:
-    api_key: ''
-    is_pro: false
-    source_lang: Automatic Detection
-    target_lang: English
-  nllb:
-    model_size: facebook/nllb-200-1.3B
-    source_lang: null
-    target_lang: null
-    max_length: 200
-  add_timestamp: false

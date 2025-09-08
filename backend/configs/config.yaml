@@ -5,6 +5,22 @@ whisper:
   compute_type: float16
   # Whether to offload the model after the inference.
   enable_offload: true
+  # Beam size for decoding
+  beam_size: 3
+  # Temperature for sampling
+  temperature: 0.0
+  # Enable audio preprocessing (noise reduction, normalization)
+  enable_preprocessing: true
+  # Enable postprocessing (spell correction)
+  enable_postprocessing: true
+  # Default chunk length (seconds) to use for songs / long audio
+  chunk_length: 30
+  # Enable VAD by default for production
+  vad_filter: true
+  # Disable BGM separation by default for production (safer with diarization)
+  separate_bgm_by_default: false
+  # Use Silero STT as alternative
+  use_silero_stt: false
 
 bgm_separation:
   # UVR model sizes between ["UVR-MDX-NET-Inst_HQ_4", "UVR-MDX-NET-Inst_3"]
@@ -14,6 +30,28 @@ bgm_separation:
   # Device to load BGM separation model between ["cuda", "cpu", "xpu"]
   device: cuda
 
+diarization:
+  # Whether to enable diarization by default
+  enable_by_default: false
+  # Device to load diarization model between ["cuda", "cpu"]
+  device: cuda
+  # Whether to offload the model after the inference
+  enable_offload: true
+  # Merge settings for diarization segments
+  merge_settings:
+    # Default merge gap for speech (seconds)
+    default_merge_gap: 0.3
+    # Conservative merge gap for music/songs (seconds)
+    music_merge_gap: 0.1
+    # Minimum segment length (seconds)
+    min_segment_length: 0.5
+    # Minimum segment length for music (seconds)
+    music_min_segment_length: 0.2
+    # Maximum segment length to prevent over-merging (seconds)
+    max_segment_length: 15.0
+    # Maximum segment length for music (seconds)
+    music_max_segment_length: 6.0
+  # Keywords to detect music content for adaptive settings
 # Settings that apply to the `cache' directory. The output files for `/bgm-separation` are stored in the `cache' directory,
 # (You can check out the actual generated files by testing `/bgm-separation`.)
 # You can adjust the TTL/cleanup frequency of the files in the `cache' directory here.

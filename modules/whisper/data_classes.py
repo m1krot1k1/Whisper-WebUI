@@ -257,16 +257,16 @@ class BGMSeparationParams(BaseParams):
 
 class WhisperParams(BaseParams):
     """Whisper parameters"""
-    model_size: str = Field(default="large-v2", description="Whisper model size")
+    model_size: str = Field(default="Systran/faster-whisper-large-v3", description="Whisper model size")
     lang: Optional[str] = Field(default=None, description="Source language of the file to transcribe")
     is_translate: bool = Field(default=False, description="Translate speech to English end-to-end")
     beam_size: int = Field(default=5, ge=1, description="Beam size for decoding")
     log_prob_threshold: float = Field(
-        default=-1.0,
+        default=0.0,
         description="Threshold for average log probability of sampled tokens"
     )
     no_speech_threshold: float = Field(
-        default=0.6,
+        default=0.1,
         ge=0.0,
         le=1.0,
         description="Threshold for detecting silence"
@@ -296,7 +296,7 @@ class WhisperParams(BaseParams):
         description="Threshold for gzip compression ratio"
     )
     length_penalty: float = Field(default=1.0, gt=0, description="Exponential length penalty")
-    repetition_penalty: float = Field(default=1.0, gt=0, description="Penalty for repeated tokens")
+    repetition_penalty: float = Field(default=0.8, gt=0, description="Penalty for repeated tokens")
     no_repeat_ngram_size: int = Field(default=0, ge=0, description="Size of n-grams to prevent repetition")
     prefix: Optional[str] = Field(default=None, description="Prefix text for first window")
     suppress_blank: bool = Field(
@@ -305,7 +305,7 @@ class WhisperParams(BaseParams):
     )
     suppress_tokens: Optional[Union[List[int], str]] = Field(default=[-1], description="Token IDs to suppress")
     max_initial_timestamp: float = Field(
-        default=1.0,
+        default=0.5,
         ge=0.0,
         description="Maximum initial timestamp"
     )

@@ -11,6 +11,7 @@ import ctranslate2
 import whisper
 import gradio as gr
 from argparse import Namespace
+import librosa
 
 from modules.utils.paths import (FASTER_WHISPER_MODELS_DIR, DIARIZATION_MODELS_DIR, UVR_MODELS_DIR, OUTPUT_DIR)
 from modules.whisper.data_classes import *
@@ -34,14 +35,14 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
         os.makedirs(self.model_dir, exist_ok=True)
 
         self.model_paths = self.get_model_paths()
-        self.device = self.get_device()
+        self.device = BaseTranscriptionPipeline.get_device()
         self.available_models = self.model_paths.keys()
 
     def transcribe(self,
                    audio: Union[str, BinaryIO, np.ndarray],
                    progress: gr.Progress = gr.Progress(),
                    progress_callback: Optional[Callable] = None,
-                   *whisper_params,
+                   params: Optional[WhisperParams] = None,
                    ) -> Tuple[List[Segment], float]:
         """
         transcribe method for faster-whisper.
@@ -54,7 +55,7 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
             Indicator to show progress directly in gradio.
         progress_callback: Optional[Callable]
             callback function to show progress. Can be used to update progress in the backend.
-        *whisper_params: tuple
+        params: WhisperParams
             Parameters related with whisper. This will be dealt with "WhisperParameters" data class
 
         Returns
@@ -66,10 +67,30 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
         """
         start_time = time.time()
 
-        params = WhisperParams.from_list(list(whisper_params))
+        if params is None:
+            params = WhisperParams()
 
         if params.model_size != self.current_model_size or self.model is None or self.current_compute_type != params.compute_type:
             self.update_model(params.model_size, params.compute_type, progress)
+
+        # Use Silero STT if enabled
+        if hasattr(self, 'use_silero_stt') and self.use_silero_stt:
+            if isinstance(audio, str):
+                audio_np, _ = librosa.load(audio, sr=16000)
+            elif isinstance(audio, bytes):
+                audio_np = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32767.0
+            else:
+                audio_np = audio
+
+            silero_text = self.transcribe_with_silero(audio_np, params.lang or 'ru')
+            if silero_text:
+                # Create a single segment with Silero result
+                segment = Segment(
+                    text=silero_text,
+                    start=0.0,
+                    end=10.0  # approximate
+                )
+                return [segment], time.time() - start_time
 
         segments, info = self.model.transcribe(
             audio=audio,
@@ -88,11 +109,11 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
             no_repeat_ngram_size=params.no_repeat_ngram_size,
             prefix=params.prefix,
             suppress_blank=params.suppress_blank,
-            suppress_tokens=params.suppress_tokens,
+            suppress_tokens=ast.literal_eval(params.suppress_tokens) if isinstance(params.suppress_tokens, str) else params.suppress_tokens,
             max_initial_timestamp=params.max_initial_timestamp,
             word_timestamps=True,  # Set it to always True as it reduces hallucinations
-            prepend_punctuations=params.prepend_punctuations,
-            append_punctuations=params.append_punctuations,
+            prepend_punctuations=params.prepend_punctuations or "\"'“¿([{-",
+            append_punctuations=params.append_punctuations or "\"'.。,，!！?？:：”)]}、",
             max_new_tokens=params.max_new_tokens,
             chunk_length=params.chunk_length,
             hallucination_silence_threshold=params.hallucination_silence_threshold,
@@ -104,12 +125,15 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
         progress(0, desc="Loading audio..")
 
         segments_result = []
-        for segment in segments:
-            progress_n = segment.start / info.duration
-            progress(progress_n, desc="Transcribing..")
-            if progress_callback is not None:
-                progress_callback(progress_n)
-            segments_result.append(Segment.from_faster_whisper(segment))
+        if info and hasattr(info, 'duration'):
+            for segment in segments:
+                progress_n = segment.start / info.duration
+                progress(progress_n, desc="Transcribing..")
+                if progress_callback is not None:
+                    progress_callback(progress_n)
+                segments_result.append(Segment.from_faster_whisper(segment))
+        else:
+            segments_result = [Segment.from_faster_whisper(s) for s in segments]
 
         elapsed_time = time.time() - start_time
         return segments_result, elapsed_time
@@ -136,63 +160,42 @@ class FasterWhisperInference(BaseTranscriptionPipeline):
         progress(0, desc="Initializing Model..")
 
         model_size_dirname = model_size.replace("/", "--") if "/" in model_size else model_size
-        if model_size not in self.model_paths and model_size_dirname not in self.model_paths:
-            print(f"Model is not detected. Trying to download \"{model_size}\" from huggingface to "
-                  f"\"{os.path.join(self.model_dir, model_size_dirname)} ...")
-            huggingface_hub.snapshot_download(
-                model_size,
-                local_dir=os.path.join(self.model_dir, model_size_dirname),
-            )
-            self.model_paths = self.get_model_paths()
-            gr.Info(f"Model is downloaded with the name \"{model_size_dirname}\"")
+        model_path = os.path.join(self.model_dir, model_size_dirname)
 
-        self.current_model_size = self.model_paths[model_size_dirname]
+        if not os.path.exists(model_path) or not os.listdir(model_path):
+            progress(0, desc=f"Downloading {model_size} model..")
+            try:
+                model_path = huggingface_hub.snapshot_download(
+                    repo_id=model_size,
+                    cache_dir=self.model_dir,
+                    local_dir=model_path,
+                    local_dir_use_symlinks=False
+                )
+            except Exception as e:
+                raise gr.Error(f"Failed to download model: {e}")
 
-        local_files_only = False
-        hf_prefix = "models--Systran--faster-whisper-"
-        official_model_path = os.path.join(self.model_dir, hf_prefix+model_size)
-        if ((os.path.isdir(self.current_model_size) and os.path.exists(self.current_model_size)) or
-            (model_size in faster_whisper.available_models() and os.path.exists(official_model_path))):
-            local_files_only = True
-
-        self.current_compute_type = compute_type
         self.model = faster_whisper.WhisperModel(
+            model_size_or_path=model_path,
             device=self.device,
-            model_size_or_path=self.current_model_size,
-            download_root=self.model_dir,
-            compute_type=self.current_compute_type,
-            local_files_only=local_files_only
+            compute_type=compute_type,
         )
+        self.current_model_size = model_size
+        self.current_compute_type = compute_type
 
-    def get_model_paths(self):
-        """
-        Get available models from models path including fine-tuned model.
-
-        Returns
-        ----------
-        Name list of models
-        """
-        model_paths = {model:model for model in faster_whisper.available_models()}
-        faster_whisper_prefix = "models--Systran--faster-whisper-"
-
-        existing_models = os.listdir(self.model_dir)
-        wrong_dirs = [".locks", "faster_whisper_models_will_be_saved_here"]
-        existing_models = list(set(existing_models) - set(wrong_dirs))
-
-        for model_name in existing_models:
-            if faster_whisper_prefix in model_name:
-                model_name = model_name[len(faster_whisper_prefix):]
-
-            if model_name not in whisper.available_models():
-                model_paths[model_name] = os.path.join(self.model_dir, model_name)
+    def get_model_paths(self) -> dict:
+        model_paths = {}
+        for root, dirs, files in os.walk(self.model_dir):
+            for file in files:
+                if file == "config.json":
+                    model_name = os.path.basename(root)
+                    model_paths[model_name] = root
         return model_paths
 
     @staticmethod
     def get_device():
         if torch.cuda.is_available():
             return "cuda"
-        else:
-            return "auto"
+        return "cpu"
 
     @staticmethod
     def format_suppress_tokens_str(suppress_tokens_str: str) -> List[int]:
