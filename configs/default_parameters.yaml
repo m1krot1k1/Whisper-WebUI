@@ -1,7 +1,7 @@
 whisper:
-  model_size: "large-v2"
+  model_size: "large-v3"
   file_format: "SRT"
-  lang: "Automatic Detection"
+  lang: "russian"
   is_translate: false
   beam_size: 5
   log_prob_threshold: -1
@@ -34,7 +34,7 @@ whisper:
   enable_offload: true
 
 vad:
-  vad_filter: false
+  vad_filter: true
   threshold: 0.5
   min_speech_duration_ms: 250
   max_speech_duration_s: 9999
@@ -42,12 +42,12 @@ vad:
   speech_pad_ms: 2000
 
 diarization:
-  is_diarize: false
+  is_diarize: true
   hf_token: ""
   enable_offload: true
 
 bgm_separation:
-  is_separate_bgm: false
+  is_separate_bgm: true
   uvr_model_size: "UVR-MDX-NET-Inst_HQ_4"
   segment_size: 256
   save_file: false
