@@ -17,12 +17,30 @@ logger = get_logger()
 
 try:
     from uvr.models import MDX, Demucs, VrNetwork, MDXC
+    UVR_AVAILABLE = True
 except Exception as e:
     logger.warning(
         "Failed to import uvr. BGM separation feature will not work. "
         "Please open an issue on GitHub if you encounter this error. "
         f"Error: {type(e).__name__}: {traceback.format_exc()}"
     )
+    UVR_AVAILABLE = False
+    # Define dummy classes to prevent NameError
+    class MDX:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
+    
+    class Demucs:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
+    
+    class VrNetwork:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
+    
+    class MDXC:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
 
 
 class MusicSeparator:
@@ -59,6 +77,9 @@ class MusicSeparator:
             device (str): Device to use for the model.
             segment_size (int): Segment size for the prediction.
         """
+        if not UVR_AVAILABLE:
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
+            
         if device is None:
             device = self.device
 
@@ -97,6 +118,8 @@ class MusicSeparator:
             np.ndarray: Vocals numpy arrays.
             file_paths: List of file paths where the separated audio is saved. Return empty when save_file is False.
         """
+        if not UVR_AVAILABLE:
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
         if isinstance(audio, str):
             output_filename, ext = os.path.basename(audio), ".wav"
             output_filename, orig_ext = os.path.splitext(output_filename)
@@ -154,6 +177,9 @@ class MusicSeparator:
                        progress: gr.Progress = gr.Progress()) -> List[str]:
         """Separate the background music from the audio files. Returns only last Instrumental and vocals file paths
         to display into gr.Audio()"""
+        if not UVR_AVAILABLE:
+            raise RuntimeError("UVR module not available. BGM separation feature is disabled.")
+            
         self.cache_parameters(model_size=model_name, segment_size=segment_size)
 
         for file_path in files:

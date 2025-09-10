@@ -12,7 +12,7 @@ import gc
 from copy import deepcopy
 import time
 
-from modules.uvr.music_separator import MusicSeparator
+from modules.uvr.music_separator import MusicSeparator, UVR_AVAILABLE
 from modules.utils.paths import (WHISPER_MODELS_DIR, DIARIZATION_MODELS_DIR, OUTPUT_DIR, DEFAULT_PARAMETERS_CONFIG_PATH,
                                  UVR_MODELS_DIR)
 from modules.utils.constants import *
@@ -125,26 +125,29 @@ class BaseTranscriptionPipeline(ABC):
         bgm_params, vad_params, whisper_params, diarization_params = params.bgm_separation, params.vad, params.whisper, params.diarization
 
         if bgm_params.is_separate_bgm:
-            music, audio, _ = self.music_separator.separate(
-                audio=audio,
-                model_name=bgm_params.uvr_model_size,
-                device=bgm_params.uvr_device,
-                segment_size=bgm_params.segment_size,
-                save_file=bgm_params.save_file,
-                progress=progress
-            )
+            if UVR_AVAILABLE:
+                music, audio, _ = self.music_separator.separate(
+                    audio=audio,
+                    model_name=bgm_params.uvr_model_size,
+                    device=bgm_params.uvr_device,
+                    segment_size=bgm_params.segment_size,
+                    save_file=bgm_params.save_file,
+                    progress=progress
+                )
 
-            if audio.ndim >= 2:
-                audio = audio.mean(axis=1)
-                if self.music_separator.audio_info is None:
-                    origin_sample_rate = 16000
-                else:
-                    origin_sample_rate = self.music_separator.audio_info.sample_rate
-                audio = self.resample_audio(audio=audio, original_sample_rate=origin_sample_rate)
+                if audio.ndim >= 2:
+                    audio = audio.mean(axis=1)
+                    if self.music_separator.audio_info is None:
+                        origin_sample_rate = 16000
+                    else:
+                        origin_sample_rate = self.music_separator.audio_info.sample_rate
+                    audio = self.resample_audio(audio=audio, original_sample_rate=origin_sample_rate)
 
-            if bgm_params.enable_offload:
-                self.music_separator.offload()
-            elapsed_time_bgm_sep = time.time() - start_time
+                if bgm_params.enable_offload:
+                    self.music_separator.offload()
+                elapsed_time_bgm_sep = time.time() - start_time
+            else:
+                logger.warning("BGM separation is enabled but UVR module is not available. Skipping BGM separation.")
 
         origin_audio = deepcopy(audio)
 
