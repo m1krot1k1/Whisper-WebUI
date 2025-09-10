@@ -235,6 +235,9 @@ class BaseTranscriptionPipeline(ABC):
             logger.info(f"Whisper did not detected any speech segments in the audio.")
             result = [Segment()]
 
+        # Filter out hallucinations for all implementations
+        result = self._filter_hallucinations(result)
+
         progress(1.0, desc="Finished.")
         total_elapsed_time = time.time() - start_time
         return result, total_elapsed_time
@@ -634,6 +637,75 @@ class BaseTranscriptionPipeline(ABC):
 
         if cached_yaml is not None and cached_yaml:
             save_yaml(cached_yaml, DEFAULT_PARAMETERS_CONFIG_PATH)
+
+    def _filter_hallucinations(self, segments: List[Segment]) -> List[Segment]:
+        """
+        Filter out hallucinated segments that are likely generated after the actual audio ends.
+        This includes repeated phrases, very short segments, and segments with identical timestamps.
+        """
+        if not segments:
+            return segments
+            
+        filtered = []
+        seen_texts = set()
+        min_duration = 0.1  # Minimum segment duration in seconds
+        
+        for i, segment in enumerate(segments):
+            text = segment.text.strip() if segment.text else ""
+            start = segment.start or 0
+            end = segment.end or 0
+            duration = end - start
+            
+            # Skip empty or very short segments
+            if not text or duration < min_duration:
+                continue
+                
+            # Skip segments with identical start and end times (likely hallucinations)
+            if start == end:
+                continue
+                
+            # Skip repeated text (hallucinations often repeat the same phrase)
+            if text in seen_texts:
+                continue
+                
+            # Skip segments that are too short and contain common hallucination phrases
+            hallucination_phrases = [
+                "продолжение следует",
+                "продолжение следует.",
+                "продолжение следует...",
+                "to be continued",
+                "continued",
+                "the end",
+                "конец",
+                "конец.",
+                "конец...",
+                "спасибо за внимание",
+                "спасибо за просмотр",
+                "thank you for watching",
+                "thanks for watching"
+            ]
+            
+            if duration < 0.5 and any(phrase in text.lower() for phrase in hallucination_phrases):
+                continue
+                
+            # Skip segments with very low probability (if available)
+            if segment.words:
+                avg_prob = sum(word.probability or 0 for word in segment.words) / len(segment.words)
+                if avg_prob < 0.1:  # Very low confidence
+                    continue
+            
+            # Check for suspicious patterns (many segments with identical timestamps)
+            if i > 0:
+                prev_segment = segments[i-1]
+                if (prev_segment.start == start and 
+                    prev_segment.end == end and
+                    text == (prev_segment.text or "").strip()):
+                    continue
+            
+            seen_texts.add(text)
+            filtered.append(segment)
+            
+        return filtered
 
     @staticmethod
     def resample_audio(audio: Union[str, np.ndarray],
