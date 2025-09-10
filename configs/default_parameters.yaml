@@ -43,7 +43,7 @@ vad:
 
 diarization:
   is_diarize: true
-  hf_token: "${HF_TOKEN}"
+  hf_token: ""
   enable_offload: true
 
 bgm_separation:
