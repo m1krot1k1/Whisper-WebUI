@@ -194,13 +194,26 @@ class BaseTranscriptionPipeline(ABC):
         if diarization_params.is_diarize:
             progress(0.99, desc="Diarizing speakers..")
             
-            # Get token from params or environment
-            hf_token = diarization_params.hf_token if diarization_params.hf_token and diarization_params.hf_token.strip() else os.environ.get("HF_TOKEN")
+            # Get token from config file first, then environment
+            hf_token = None
+            
+            # Try to load from config file
+            try:
+                import yaml
+                from modules.utils.paths import SERVER_CONFIG_PATH
+                config = yaml.safe_load(open(SERVER_CONFIG_PATH, 'r'))
+                hf_token = config.get('hf_token', '')
+            except Exception as e:
+                logger.debug(f"Could not load config file: {e}")
+            
+            # Fallback to environment variable
+            if not hf_token or hf_token.strip() == "":
+                hf_token = os.environ.get("HF_TOKEN", "")
             
             # Check if token is valid (not placeholder)
             if not hf_token or hf_token in ["", "your_token_here", "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
                 logger.warning("Invalid or missing HuggingFace token. Diarization will be skipped.")
-                logger.info("Please set a valid HF_TOKEN in your .env file or in the web interface.")
+                logger.info("Please set a valid HF_TOKEN in backend/configs/config.yaml or as environment variable.")
                 logger.info("Get your token from: https://huggingface.co/settings/tokens")
             else:
                 result, elapsed_time_diarization = self.diarizer.run(

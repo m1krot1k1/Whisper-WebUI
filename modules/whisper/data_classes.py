@@ -158,10 +158,6 @@ class DiarizationParams(BaseParams):
     """Speaker diarization parameters"""
     is_diarize: bool = Field(default=False, description="Enable speaker diarization")
     diarization_device: str = Field(default="cuda", description="Device to run Diarization model.")
-    hf_token: str = Field(
-        default="",
-        description="Hugging Face token for downloading diarization models"
-    )
     enable_offload: bool = Field(
         default=True,
         description="Offload Diarization model after Speaker diarization"
@@ -181,11 +177,6 @@ class DiarizationParams(BaseParams):
                 label=_("Device"),
                 choices=["cpu", "cuda", "xpu"] if available_devices is None else available_devices,
                 value=defaults.get("device", device),
-            ),
-            gr.Textbox(
-                label=_("HuggingFace Token"),
-                value=defaults.get("hf_token") or os.environ.get("HF_TOKEN", "") or cls.__fields__["hf_token"].default,
-                info=_("This is only needed the first time you download the model")
             ),
             gr.Checkbox(
                 label=_("Offload sub model when finished"),

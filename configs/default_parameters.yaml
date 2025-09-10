@@ -47,9 +47,8 @@ vad:
   min_silence_duration_ms: 400
   speech_pad_ms: 200
 diarization:
-  is_diarize: false
+  is_diarize: true
   diarization_device: cuda
-  hf_token: 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
   enable_offload: true
 bgm_separation:
   is_separate_bgm: false
