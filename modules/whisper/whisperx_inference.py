@@ -136,7 +136,7 @@ class WhisperXInference(BaseTranscriptionPipeline):
 
         self.current_model_size = model_size
 
-        # Use device from base class or default to cuda if available
+        # Use CUDA if available, otherwise CPU
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.model = whisperx.load_model(
