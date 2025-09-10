@@ -23,10 +23,8 @@ whisper:
   suppress_tokens: "[-1]"
   max_initial_timestamp: 1
   word_timestamps: false
-  prepend_punctuations: |
-    "'""¿([{-
-  append_punctuations: |
-    "'.。,，!！?？:：")]}、
+  prepend_punctuations: "\"'“¿([{-"
+  append_punctuations: "\"'.。,，!！?？:：”)]}、"
   max_new_tokens: null
   hallucination_silence_threshold: null
   hotwords: null
