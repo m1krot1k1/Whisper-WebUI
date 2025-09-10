@@ -193,12 +193,22 @@ class BaseTranscriptionPipeline(ABC):
 
         if diarization_params.is_diarize:
             progress(0.99, desc="Diarizing speakers..")
-            result, elapsed_time_diarization = self.diarizer.run(
-                audio=origin_audio,
-                use_auth_token=diarization_params.hf_token if diarization_params.hf_token else os.environ.get("HF_TOKEN"),
-                transcribed_result=result,
-                device=diarization_params.diarization_device
-            )
+            
+            # Get token from params or environment
+            hf_token = diarization_params.hf_token if diarization_params.hf_token and diarization_params.hf_token.strip() else os.environ.get("HF_TOKEN")
+            
+            # Check if token is valid (not placeholder)
+            if not hf_token or hf_token in ["", "your_token_here", "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+                logger.warning("Invalid or missing HuggingFace token. Diarization will be skipped.")
+                logger.info("Please set a valid HF_TOKEN in your .env file or in the web interface.")
+                logger.info("Get your token from: https://huggingface.co/settings/tokens")
+            else:
+                result, elapsed_time_diarization = self.diarizer.run(
+                    audio=origin_audio,
+                    use_auth_token=hf_token,
+                    transcribed_result=result,
+                    device=diarization_params.diarization_device
+                )
             if diarization_params.enable_offload:
                 self.diarizer.offload()
 
@@ -270,6 +280,9 @@ class BaseTranscriptionPipeline(ABC):
                 files = [files]
             if files and isinstance(files[0], gr.utils.NamedString):
                 files = [file.name for file in files]
+
+            if not files:
+                return "No files provided for transcription."
 
             files_info = {}
             for file in files:

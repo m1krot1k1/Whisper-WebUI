@@ -1,6 +1,7 @@
 import faster_whisper.transcribe
 import gradio as gr
 import torch
+import os
 from typing import Optional, Dict, List, Union, NamedTuple
 from fastapi import Query
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -182,7 +183,7 @@ class DiarizationParams(BaseParams):
             ),
             gr.Textbox(
                 label=_("HuggingFace Token"),
-                value=defaults.get("hf_token", cls.__fields__["hf_token"].default),
+                value=defaults.get("hf_token") or os.environ.get("HF_TOKEN", "") or cls.__fields__["hf_token"].default,
                 info=_("This is only needed the first time you download the model")
             ),
             gr.Checkbox(

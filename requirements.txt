@@ -25,3 +25,6 @@ git+https://github.com/jhj0517/pyrubberband.git
 
 # Note: UVR module is created locally in venv/lib/python3.10/site-packages/uvr/
 # This provides basic functionality for BGM separation when the full UVR package is not available
+
+# Environment variables support
+python-dotenv==1.1.1

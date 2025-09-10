@@ -3,6 +3,11 @@ import argparse
 import gradio as gr
 from gradio_i18n import Translate, gettext as _
 import yaml
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Try backend config first, then root directory
+load_dotenv('/root/Whisper-WebUI/backend/configs/.env')
 
 from modules.utils.paths import (FASTER_WHISPER_MODELS_DIR, DIARIZATION_MODELS_DIR, OUTPUT_DIR, WHISPER_MODELS_DIR,
                                  INSANELY_FAST_WHISPER_MODELS_DIR, NLLB_MODELS_DIR, DEFAULT_PARAMETERS_CONFIG_PATH,
