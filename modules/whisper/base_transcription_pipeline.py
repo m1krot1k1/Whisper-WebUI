@@ -12,7 +12,7 @@ import gc
 from copy import deepcopy
 import time
 
-from modules.uvr.music_separator import MusicSeparator
+from modules.uvr.music_separator import MusicSeparator, UVR_AVAILABLE
 from modules.utils.paths import (WHISPER_MODELS_DIR, DIARIZATION_MODELS_DIR, OUTPUT_DIR, DEFAULT_PARAMETERS_CONFIG_PATH,
                                  UVR_MODELS_DIR)
 from modules.utils.constants import *
@@ -125,26 +125,29 @@ class BaseTranscriptionPipeline(ABC):
         bgm_params, vad_params, whisper_params, diarization_params = params.bgm_separation, params.vad, params.whisper, params.diarization
 
         if bgm_params.is_separate_bgm:
-            music, audio, _ = self.music_separator.separate(
-                audio=audio,
-                model_name=bgm_params.uvr_model_size,
-                device=bgm_params.uvr_device,
-                segment_size=bgm_params.segment_size,
-                save_file=bgm_params.save_file,
-                progress=progress
-            )
+            if UVR_AVAILABLE:
+                music, audio, _ = self.music_separator.separate(
+                    audio=audio,
+                    model_name=bgm_params.uvr_model_size,
+                    device=bgm_params.uvr_device,
+                    segment_size=bgm_params.segment_size,
+                    save_file=bgm_params.save_file,
+                    progress=progress
+                )
 
-            if audio.ndim >= 2:
-                audio = audio.mean(axis=1)
-                if self.music_separator.audio_info is None:
-                    origin_sample_rate = 16000
-                else:
-                    origin_sample_rate = self.music_separator.audio_info.sample_rate
-                audio = self.resample_audio(audio=audio, original_sample_rate=origin_sample_rate)
+                if audio.ndim >= 2:
+                    audio = audio.mean(axis=1)
+                    if self.music_separator.audio_info is None:
+                        origin_sample_rate = 16000
+                    else:
+                        origin_sample_rate = self.music_separator.audio_info.sample_rate
+                    audio = self.resample_audio(audio=audio, original_sample_rate=origin_sample_rate)
 
-            if bgm_params.enable_offload:
-                self.music_separator.offload()
-            elapsed_time_bgm_sep = time.time() - start_time
+                if bgm_params.enable_offload:
+                    self.music_separator.offload()
+                elapsed_time_bgm_sep = time.time() - start_time
+            else:
+                logger.warning("BGM separation is enabled but UVR module is not available. Skipping BGM separation.")
 
         origin_audio = deepcopy(audio)
 
@@ -190,12 +193,35 @@ class BaseTranscriptionPipeline(ABC):
 
         if diarization_params.is_diarize:
             progress(0.99, desc="Diarizing speakers..")
-            result, elapsed_time_diarization = self.diarizer.run(
-                audio=origin_audio,
-                use_auth_token=diarization_params.hf_token if diarization_params.hf_token else os.environ.get("HF_TOKEN"),
-                transcribed_result=result,
-                device=diarization_params.diarization_device
-            )
+            
+            # Get token from config file first, then environment
+            hf_token = None
+            
+            # Try to load from config file
+            try:
+                import yaml
+                from modules.utils.paths import SERVER_CONFIG_PATH
+                config = yaml.safe_load(open(SERVER_CONFIG_PATH, 'r'))
+                hf_token = config.get('hf_token', '')
+            except Exception as e:
+                logger.debug(f"Could not load config file: {e}")
+            
+            # Fallback to environment variable
+            if not hf_token or hf_token.strip() == "":
+                hf_token = os.environ.get("HF_TOKEN", "")
+            
+            # Check if token is valid (not placeholder)
+            if not hf_token or hf_token in ["", "your_token_here", "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+                logger.warning("Invalid or missing HuggingFace token. Diarization will be skipped.")
+                logger.info("Please set a valid HF_TOKEN in backend/configs/config.yaml or as environment variable.")
+                logger.info("Get your token from: https://huggingface.co/settings/tokens")
+            else:
+                result, elapsed_time_diarization = self.diarizer.run(
+                    audio=origin_audio,
+                    use_auth_token=hf_token,
+                    transcribed_result=result,
+                    device=diarization_params.diarization_device
+                )
             if diarization_params.enable_offload:
                 self.diarizer.offload()
 
@@ -267,6 +293,9 @@ class BaseTranscriptionPipeline(ABC):
                 files = [files]
             if files and isinstance(files[0], gr.utils.NamedString):
                 files = [file.name for file in files]
+
+            if not files:
+                return "No files provided for transcription."
 
             files_info = {}
             for file in files:

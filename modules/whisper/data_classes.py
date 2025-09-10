@@ -1,6 +1,7 @@
 import faster_whisper.transcribe
 import gradio as gr
 import torch
+import os
 from typing import Optional, Dict, List, Union, NamedTuple
 from fastapi import Query
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -16,6 +17,7 @@ class WhisperImpl(Enum):
     WHISPER = "whisper"
     FASTER_WHISPER = "faster-whisper"
     INSANELY_FAST_WHISPER = "insanely_fast_whisper"
+    WHISPERX = "whisperx"
 
 
 class Segment(BaseModel):
@@ -156,10 +158,6 @@ class DiarizationParams(BaseParams):
     """Speaker diarization parameters"""
     is_diarize: bool = Field(default=False, description="Enable speaker diarization")
     diarization_device: str = Field(default="cuda", description="Device to run Diarization model.")
-    hf_token: str = Field(
-        default="",
-        description="Hugging Face token for downloading diarization models"
-    )
     enable_offload: bool = Field(
         default=True,
         description="Offload Diarization model after Speaker diarization"
@@ -179,11 +177,6 @@ class DiarizationParams(BaseParams):
                 label=_("Device"),
                 choices=["cpu", "cuda", "xpu"] if available_devices is None else available_devices,
                 value=defaults.get("device", device),
-            ),
-            gr.Textbox(
-                label=_("HuggingFace Token"),
-                value=defaults.get("hf_token", cls.__fields__["hf_token"].default),
-                info=_("This is only needed the first time you download the model")
             ),
             gr.Checkbox(
                 label=_("Offload sub model when finished"),
@@ -556,6 +549,7 @@ class WhisperParams(BaseParams):
                 info="Batch size for processing"
             )
         ]
+
 
         if whisper_type != WhisperImpl.FASTER_WHISPER.value:
             for input_component in faster_whisper_inputs:
