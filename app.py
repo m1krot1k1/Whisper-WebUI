@@ -350,7 +350,7 @@ parser.add_argument('--server_port', type=int, default=None, help='Gradio server
 parser.add_argument('--root_path', type=str, default=None, help='Gradio root path')
 parser.add_argument('--username', type=str, default=None, help='Gradio authentication username')
 parser.add_argument('--password', type=str, default=None, help='Gradio authentication password')
-parser.add_argument('--theme', type=str, default=None, help='Gradio Blocks theme')
+parser.add_argument('--theme', type=str, default='dark', help='Gradio Blocks theme')
 parser.add_argument('--colab', type=str2bool, default=False, nargs='?', const=True, help='Is colab user or not')
 parser.add_argument('--api_open', type=str2bool, default=False, nargs='?', const=True,
                     help='Enable api or not in Gradio')
