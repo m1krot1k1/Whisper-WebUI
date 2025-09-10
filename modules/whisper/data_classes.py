@@ -17,6 +17,7 @@ class WhisperImpl(Enum):
     WHISPER = "whisper"
     FASTER_WHISPER = "faster-whisper"
     INSANELY_FAST_WHISPER = "insanely_fast_whisper"
+    WHISPERX = "whisperx"
 
 
 class Segment(BaseModel):
@@ -557,6 +558,7 @@ class WhisperParams(BaseParams):
                 info="Batch size for processing"
             )
         ]
+
 
         if whisper_type != WhisperImpl.FASTER_WHISPER.value:
             for input_component in faster_whisper_inputs:

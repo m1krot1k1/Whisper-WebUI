@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 load_dotenv('/root/Whisper-WebUI/backend/configs/.env')
 
 from modules.utils.paths import (FASTER_WHISPER_MODELS_DIR, DIARIZATION_MODELS_DIR, OUTPUT_DIR, WHISPER_MODELS_DIR,
-                                 INSANELY_FAST_WHISPER_MODELS_DIR, NLLB_MODELS_DIR, DEFAULT_PARAMETERS_CONFIG_PATH,
-                                 UVR_MODELS_DIR, I18N_YAML_PATH)
+                                 INSANELY_FAST_WHISPER_MODELS_DIR, WHISPERX_MODELS_DIR, NLLB_MODELS_DIR, DEFAULT_PARAMETERS_CONFIG_PATH,
+                                 UVR_MODELS_DIR, I18N_YAML_PATH, SERVER_CONFIG_PATH)
 from modules.utils.files_manager import load_yaml, MEDIA_EXTENSION
 from modules.whisper.whisper_factory import WhisperFactory
 from modules.translation.nllb_inference import NLLBInference
@@ -29,13 +29,18 @@ logger = get_logger()
 class App:
     def __init__(self, args):
         self.args = args
+        # Load backend config to get implementation type
+        backend_config = load_yaml(SERVER_CONFIG_PATH)
+        self.whisper_implementation = backend_config.get("whisper", {}).get("implementation", "faster-whisper")
+
         # Check every 1 hour (3600) for cached files and delete them if older than 1 day (86400)
         self.app = gr.Blocks(css=CSS, theme=self.args.theme, delete_cache=(3600, 86400))
         self.whisper_inf = WhisperFactory.create_whisper_inference(
-            whisper_type=self.args.whisper_type,
+            whisper_type=self.whisper_implementation,
             whisper_model_dir=self.args.whisper_model_dir,
             faster_whisper_model_dir=self.args.faster_whisper_model_dir,
             insanely_fast_whisper_model_dir=self.args.insanely_fast_whisper_model_dir,
+            whisperx_model_dir=self.args.whisperx_model_dir,
             uvr_model_dir=self.args.uvr_model_dir,
             output_dir=self.args.output_dir,
         )
@@ -48,7 +53,7 @@ class App:
         )
         self.i18n = load_yaml(I18N_YAML_PATH)
         self.default_params = load_yaml(DEFAULT_PARAMETERS_CONFIG_PATH)
-        logger.info(f"Use \"{self.args.whisper_type}\" implementation\n"
+        logger.info(f"Use \"{self.whisper_implementation}\" implementation from config\n"
                     f"Device \"{self.whisper_inf.device}\" is detected")
 
     def create_pipeline_inputs(self):
@@ -364,6 +369,9 @@ parser.add_argument('--faster_whisper_model_dir', type=str, default=FASTER_WHISP
 parser.add_argument('--insanely_fast_whisper_model_dir', type=str,
                     default=INSANELY_FAST_WHISPER_MODELS_DIR,
                     help='Directory path of the insanely-fast-whisper model')
+parser.add_argument('--whisperx_model_dir', type=str,
+                    default=WHISPERX_MODELS_DIR,
+                    help='Directory path of the whisperX model')
 parser.add_argument('--diarization_model_dir', type=str, default=DIARIZATION_MODELS_DIR,
                     help='Directory path of the diarization model')
 parser.add_argument('--nllb_model_dir', type=str, default=NLLB_MODELS_DIR,
