@@ -27,6 +27,12 @@ class WhisperXInference(BaseTranscriptionPipeline):
         self.model_dir = model_dir
         os.makedirs(self.model_dir, exist_ok=True)
 
+        # Load Whisper configuration (WhisperX uses main whisper config)
+        import yaml
+        from modules.utils.paths import SERVER_CONFIG_PATH
+        config = yaml.safe_load(open(SERVER_CONFIG_PATH, 'r'))
+        self.whisper_config = config.get('whisper', {})
+
         self.model_paths = self.get_model_paths()
         self.device = self.get_device()
         self.available_models = self.model_paths.keys()
@@ -63,7 +69,7 @@ class WhisperXInference(BaseTranscriptionPipeline):
         params = WhisperParams.from_list(list(whisper_params))
 
         if params.model_size != self.current_model_size or self.model is None:
-            self.update_model(params.model_size, progress)
+            self.update_model(params.model_size, params, progress)
 
         # Load audio if it's a file path
         if isinstance(audio, str):
@@ -75,44 +81,74 @@ class WhisperXInference(BaseTranscriptionPipeline):
 
         progress(0, desc="Transcribing with WhisperX..")
 
-        # Transcribe with WhisperX
+        # Transcribe with WhisperX using only basic supported parameters
         result = self.model.transcribe(
             audio,
             language=params.lang if params.lang != "auto" else None,
-            batch_size=16,  # Default batch size
-            print_progress=True
+            batch_size=params.batch_size
         )
 
-        # Align the output
-        if result["segments"]:
+        # Align the output for better word spacing (if enabled)
+        enable_alignment = self.whisper_config.get('enable_alignment', True)
+        if result["segments"] and enable_alignment:
             progress(0.5, desc="Aligning transcription..")
-            model_a, metadata = whisperx.load_align_model(
-                language_code=result["language"],
-                device=self.device
-            )
-            result = whisperx.align(
-                result["segments"],
-                model_a,
-                metadata,
-                audio,
-                self.device,
-                return_char_alignments=False
-            )
+            try:
+                model_a, metadata = whisperx.load_align_model(
+                    language_code=result["language"],
+                    device=self.device
+                )
+
+                return_char_alignments = self.whisper_config.get('return_char_alignments', True)
+
+                result = whisperx.align(
+                    result["segments"],
+                    model_a,
+                    metadata,
+                    audio,
+                    self.device,
+                    return_char_alignments=return_char_alignments
+                )
+            except Exception as e:
+                print(f"Warning: Alignment failed, using original transcription: {e}")
+                # Continue with original result if alignment fails
 
         segments_result = []
-        for segment in result["segments"]:
-            segments_result.append(Segment(
-                text=segment["text"],
-                start=segment["start"],
-                end=segment["end"],
-                words=[
+        for i, segment in enumerate(result["segments"]):
+            # Get the original text from the segment
+            original_text = segment["text"]
+            
+            # If we have word-level information after alignment, reconstruct text with proper spacing
+            if "words" in segment and segment["words"] and len(segment["words"]) > 0:
+                # Reconstruct text from words to ensure proper spacing
+                reconstructed_text = " ".join([word["word"] for word in segment["words"]])
+                
+                # Use reconstructed text if it's different from original (better spacing)
+                # This handles cases where original text has spacing issues
+                if reconstructed_text.strip() != original_text.strip():
+                    processed_text = reconstructed_text
+                else:
+                    processed_text = original_text
+            else:
+                # No word-level info available, use original text
+                processed_text = original_text
+            
+            # Create word list if available
+            words = None
+            if "words" in segment and segment["words"]:
+                words = [
                     Word(
                         start=word["start"],
                         end=word["end"],
                         word=word["word"],
                         probability=word.get("probability", 0.0)
-                    ) for word in segment.get("words", [])
-                ] if "words" in segment else None
+                    ) for word in segment["words"]
+                ]
+
+            segments_result.append(Segment(
+                text=processed_text,
+                start=segment["start"],
+                end=segment["end"],
+                words=words
             ))
 
         elapsed_time = time.time() - start_time
@@ -120,6 +156,7 @@ class WhisperXInference(BaseTranscriptionPipeline):
 
     def update_model(self,
                      model_size: str,
+                     params,
                      progress: gr.Progress = gr.Progress()
                      ):
         """
@@ -129,6 +166,8 @@ class WhisperXInference(BaseTranscriptionPipeline):
         ----------
         model_size: str
             Size of whisper model.
+        params: WhisperParams
+            Parameters object containing language and other settings.
         progress: gr.Progress
             Indicator to show progress directly in gradio.
         """
@@ -136,14 +175,17 @@ class WhisperXInference(BaseTranscriptionPipeline):
 
         self.current_model_size = model_size
 
-        # Use CUDA if available, otherwise CPU
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Use device from config or auto-detect
+        device = self.whisper_config.get('device', "cuda" if torch.cuda.is_available() else "cpu")
 
+        # Load WhisperX model with proper parameters for word spacing
         self.model = whisperx.load_model(
             model_size,
             device=device,
-            compute_type="float16" if device == "cuda" else "float32",
-            download_root=self.model_dir
+            compute_type=self.whisper_config.get('compute_type', "float16" if device == "cuda" else "float32"),
+            download_root=self.model_dir,
+            # Additional parameters for better word recognition
+            language=params.lang if hasattr(params, 'lang') and params.lang and params.lang != "auto" else None
         )
 
     def get_model_paths(self):

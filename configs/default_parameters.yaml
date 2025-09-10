@@ -2,48 +2,54 @@ whisper:
   model_size: large-v3
   lang: russian
   is_translate: false
-  beam_size: 5
+  beam_size: 12
   log_prob_threshold: -1.0
-  no_speech_threshold: 0.6
+  no_speech_threshold: 0.5
   compute_type: float16
-  best_of: 5
-  patience: 1.0
+  best_of: 12
+  patience: 2.0
   condition_on_previous_text: true
-  prompt_reset_on_temperature: 0.5
-  initial_prompt: null
+  prompt_reset_on_temperature: 0.3
+  initial_prompt: 'Телефонное интервью по подбору персонала. Менеджер по персоналу
+    Ольга из компании Данила Мастер проводит первичное интервью с кандидатом Екатериной.
+    Разговор о вакансии менеджера фокус-продаж, требованиях к кандидату, опыте работы,
+    зарплатных ожиданиях. Участники разговаривают вежливо, используют профессиональную
+    терминологию. Ольга задает вопросы, Екатерина отвечает. Тема: поиск работы, собеседование,
+    карьера.'
   temperature: 0.0
-  compression_ratio_threshold: 2.4
-  length_penalty: 1.0
-  repetition_penalty: 1.0
-  no_repeat_ngram_size: 0
+  compression_ratio_threshold: 2.8
+  length_penalty: 1.2
+  repetition_penalty: 1.01
+  no_repeat_ngram_size: 3
   prefix: null
   suppress_blank: true
   suppress_tokens: '[-1]'
   max_initial_timestamp: 1.0
-  word_timestamps: false
-  prepend_punctuations: '"''“¿([{-'
-  append_punctuations: '"''.。,，!！?？:：”)]}、'
+  word_timestamps: true
+  prepend_punctuations: '"''"¿([{-'
+  append_punctuations: '.,!?;:'
   max_new_tokens: null
   chunk_length: 30
-  hallucination_silence_threshold: null
-  hotwords: null
-  language_detection_threshold: 0.5
-  language_detection_segments: 1
-  batch_size: 24
+  hallucination_silence_threshold: 1.0
+  hotwords: Данила Мастер,Екатерина,Ольга,HeadHunter,компания,менеджер фокус-продажи,интервью,перезвоню,актуально,пожалуйста,здравствуйте,добрый
+    день,спасибо,до свидания,в данный момент,в связи с тем,в том числе,в общем,работа,должность,зарплата,график,удаленно,офис,опыт,навыки,продажи,клиенты,руководитель,коллектив,мотивация,премьера,бонусы
+  language_detection_threshold: 0.6
+  language_detection_segments: 5
+  batch_size: 16
   enable_offload: true
-  add_timestamp: false
+  add_timestamp: true
   file_format: SRT
 vad:
   vad_filter: true
-  threshold: 0.5
+  threshold: 0.35
   min_speech_duration_ms: 250
-  max_speech_duration_s: 9999
-  min_silence_duration_ms: 1000
-  speech_pad_ms: 2000
+  max_speech_duration_s: 12.0
+  min_silence_duration_ms: 400
+  speech_pad_ms: 200
 diarization:
-  is_diarize: true
+  is_diarize: false
   diarization_device: cuda
-  hf_token: ''
+  hf_token: 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
   enable_offload: true
 bgm_separation:
   is_separate_bgm: false
