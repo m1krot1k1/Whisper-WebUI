@@ -9,6 +9,9 @@ import gradio as gr
 from modules.utils.paths import (WHISPERX_MODELS_DIR, DIARIZATION_MODELS_DIR, UVR_MODELS_DIR, OUTPUT_DIR)
 from modules.whisper.data_classes import *
 from modules.whisper.base_transcription_pipeline import BaseTranscriptionPipeline
+from modules.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class WhisperXInference(BaseTranscriptionPipeline):
@@ -78,6 +81,11 @@ class WhisperXInference(BaseTranscriptionPipeline):
             audio = audio_data.numpy()
             if audio.ndim > 1:
                 audio = audio.mean(axis=0)  # Convert to mono if stereo
+            
+            # Check if audio is empty
+            if audio.size == 0:
+                logger.warning(f"Audio file {audio} appears to be empty or corrupted.")
+                return [Segment()], 0
 
         progress(0, desc="Transcribing with WhisperX..")
 
