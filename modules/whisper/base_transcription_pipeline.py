@@ -129,20 +129,25 @@ class BaseTranscriptionPipeline(ABC):
 
         if bgm_params.is_separate_bgm:
             if UVR_AVAILABLE:
-                music, audio, _ = self.music_separator.separate(
-                    audio=audio,
-                    model_name=bgm_params.uvr_model_size,
-                    device=bgm_params.uvr_device,
-                    segment_size=bgm_params.segment_size,
-                    save_file=bgm_params.save_file,
-                    progress=progress
-                )
+                # Check if audio is valid before BGM separation
+                if isinstance(audio, np.ndarray) and audio.size == 0:
+                    logger.warning("Audio array is empty, skipping BGM separation.")
+                    bgm_params.is_separate_bgm = False
+                else:
+                    music, audio, _ = self.music_separator.separate(
+                        audio=audio,
+                        model_name=bgm_params.uvr_model_size,
+                        device=bgm_params.uvr_device,
+                        segment_size=bgm_params.segment_size,
+                        save_file=bgm_params.save_file,
+                        progress=progress
+                    )
 
                 # Ensure audio is float32 for Whisper compatibility
                 audio = audio.astype(np.float32)
                 
                 # Check if audio is silent after BGM separation
-                if np.max(np.abs(audio)) > 0:
+                if audio.size > 0 and np.max(np.abs(audio)) > 0:
                     # Normalize audio after music separation to prevent quiet audio issues
                     audio = audio / np.max(np.abs(audio)) * 0.95  # Normalize to 95% of max volume
                     logger.info(f"Audio normalized after BGM separation. Max amplitude: {np.max(np.abs(audio)):.4f}")
@@ -157,14 +162,14 @@ class BaseTranscriptionPipeline(ABC):
                         audio = origin_audio
                     else:
                         audio = origin_audio
-                        if np.max(np.abs(audio)) > 0:
+                        if audio.size > 0 and np.max(np.abs(audio)) > 0:
                             audio = audio / np.max(np.abs(audio)) * 0.95
                             logger.info(f"Fallback audio normalized. Max amplitude: {np.max(np.abs(audio)):.4f}")
                 
                 # Additional fallback: if BGM separation is too aggressive, try mixing with original
-                if isinstance(audio, np.ndarray) and np.max(np.abs(audio)) < 0.01:  # Very quiet audio
+                if isinstance(audio, np.ndarray) and audio.size > 0 and np.max(np.abs(audio)) < 0.01:  # Very quiet audio
                     logger.warning("Audio is very quiet after BGM separation. Mixing with original audio.")
-                    if isinstance(origin_audio, np.ndarray) and np.max(np.abs(origin_audio)) > 0:
+                    if isinstance(origin_audio, np.ndarray) and origin_audio.size > 0 and np.max(np.abs(origin_audio)) > 0:
                         # Mix 70% original + 30% separated audio
                         audio = 0.7 * origin_audio + 0.3 * audio
                         audio = audio / np.max(np.abs(audio)) * 0.95
@@ -186,6 +191,9 @@ class BaseTranscriptionPipeline(ABC):
         
         # Log audio quality for debugging
         if isinstance(audio, np.ndarray) and hasattr(audio, 'shape'):
+            if audio.size == 0:
+                logger.error("Audio array is empty! Cannot proceed with transcription.")
+                return [Segment()], 0
             logger.info(f"Audio shape: {audio.shape}, dtype: {audio.dtype}, max: {np.max(np.abs(audio)):.4f}")
         elif isinstance(audio, str):
             logger.info(f"Audio is file path: {audio}")
