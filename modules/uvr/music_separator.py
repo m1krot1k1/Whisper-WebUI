@@ -157,6 +157,10 @@ class MusicSeparator:
                          "(It will only display 0% until the job is complete.) ")
         result = self.model(audio)
         instrumental, vocals = result["instrumental"].T, result["vocals"].T
+        
+        # Convert to float32 to ensure compatibility with Whisper
+        instrumental = instrumental.astype(np.float32)
+        vocals = vocals.astype(np.float32)
 
         file_paths = []
         if save_file:
