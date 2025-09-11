@@ -47,6 +47,10 @@ class SileroVAD:
 
         if not isinstance(audio, np.ndarray):
             audio = faster_whisper.decode_audio(audio, sampling_rate=sampling_rate)
+        
+        # Ensure audio is float32 to avoid type mismatch issues
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
 
         duration = audio.shape[0] / sampling_rate
         duration_after_vad = duration
@@ -113,6 +117,8 @@ class SileroVAD:
         padded_audio = np.pad(
             audio, (0, window_size_samples - audio.shape[0] % window_size_samples)
         )
+        # Convert to float32 to match model expectations
+        padded_audio = padded_audio.astype(np.float32)
         speech_probs = self.model(padded_audio.reshape(1, -1)).squeeze(0)
 
         triggered = False

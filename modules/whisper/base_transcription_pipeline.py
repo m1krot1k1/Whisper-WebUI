@@ -124,6 +124,9 @@ class BaseTranscriptionPipeline(ABC):
         params = self.validate_gradio_values(params)
         bgm_params, vad_params, whisper_params, diarization_params = params.bgm_separation, params.vad, params.whisper, params.diarization
 
+        # Store original audio before any processing
+        origin_audio = deepcopy(audio)
+
         if bgm_params.is_separate_bgm:
             if UVR_AVAILABLE:
                 music, audio, _ = self.music_separator.separate(
@@ -135,7 +138,39 @@ class BaseTranscriptionPipeline(ABC):
                     progress=progress
                 )
 
-                if audio.ndim >= 2:
+                # Ensure audio is float32 for Whisper compatibility
+                audio = audio.astype(np.float32)
+                
+                # Check if audio is silent after BGM separation
+                if np.max(np.abs(audio)) > 0:
+                    # Normalize audio after music separation to prevent quiet audio issues
+                    audio = audio / np.max(np.abs(audio)) * 0.95  # Normalize to 95% of max volume
+                    logger.info(f"Audio normalized after BGM separation. Max amplitude: {np.max(np.abs(audio)):.4f}")
+                else:
+                    logger.warning("Audio is silent after BGM separation! Using original audio as fallback.")
+                    # Use original audio as fallback if BGM separation results in silence
+                    # If origin_audio is a string (file path), we need to load it first
+                    if isinstance(origin_audio, str):
+                        logger.info("Loading original audio from file for fallback.")
+                        # This will be handled by the normal audio loading process
+                        # We'll just skip BGM separation and use the original file
+                        audio = origin_audio
+                    else:
+                        audio = origin_audio
+                        if np.max(np.abs(audio)) > 0:
+                            audio = audio / np.max(np.abs(audio)) * 0.95
+                            logger.info(f"Fallback audio normalized. Max amplitude: {np.max(np.abs(audio)):.4f}")
+                
+                # Additional fallback: if BGM separation is too aggressive, try mixing with original
+                if isinstance(audio, np.ndarray) and np.max(np.abs(audio)) < 0.01:  # Very quiet audio
+                    logger.warning("Audio is very quiet after BGM separation. Mixing with original audio.")
+                    if isinstance(origin_audio, np.ndarray) and np.max(np.abs(origin_audio)) > 0:
+                        # Mix 70% original + 30% separated audio
+                        audio = 0.7 * origin_audio + 0.3 * audio
+                        audio = audio / np.max(np.abs(audio)) * 0.95
+                        logger.info(f"Mixed audio normalized. Max amplitude: {np.max(np.abs(audio)):.4f}")
+                
+                if isinstance(audio, np.ndarray) and audio.ndim >= 2:
                     audio = audio.mean(axis=1)
                     if self.music_separator.audio_info is None:
                         origin_sample_rate = 16000
@@ -148,8 +183,12 @@ class BaseTranscriptionPipeline(ABC):
                 elapsed_time_bgm_sep = time.time() - start_time
             else:
                 logger.warning("BGM separation is enabled but UVR module is not available. Skipping BGM separation.")
-
-        origin_audio = deepcopy(audio)
+        
+        # Log audio quality for debugging
+        if isinstance(audio, np.ndarray) and hasattr(audio, 'shape'):
+            logger.info(f"Audio shape: {audio.shape}, dtype: {audio.dtype}, max: {np.max(np.abs(audio)):.4f}")
+        elif isinstance(audio, str):
+            logger.info(f"Audio is file path: {audio}")
 
         if vad_params.vad_filter:
             progress(0, desc="Filtering silent parts from audio..")
