@@ -14,9 +14,6 @@ whisper:
   # Device for WhisperX (cuda/cpu)
   device: cuda
 
-# HuggingFace token for downloading diarization models
-hf_token: 
-
 bgm_separation:
   # UVR model sizes between ["UVR-MDX-NET-Inst_HQ_4", "UVR-MDX-NET-Inst_3"]
   model_size: UVR-MDX-NET-Inst_3

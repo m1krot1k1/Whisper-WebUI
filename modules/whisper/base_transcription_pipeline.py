@@ -241,34 +241,24 @@ class BaseTranscriptionPipeline(ABC):
         if diarization_params.is_diarize:
             progress(0.99, desc="Diarizing speakers..")
             
-            # Get token from config file first, then environment
-            hf_token = None
-            
-            # Try to load from config file
-            try:
-                import yaml
-                from modules.utils.paths import SERVER_CONFIG_PATH
-                config = yaml.safe_load(open(SERVER_CONFIG_PATH, 'r'))
-                hf_token = config.get('hf_token', '')
-            except Exception as e:
-                logger.debug(f"Could not load config file: {e}")
-            
-            # Fallback to environment variable
-            if not hf_token or hf_token.strip() == "":
-                hf_token = os.environ.get("HF_TOKEN", "")
+            # Get token from environment variable using the proper loader
+            from backend.common.config_loader import read_env
+            hf_token = read_env("HF_TOKEN", "")
             
             # Check if token is valid (not placeholder)
             if not hf_token or hf_token in ["", "your_token_here", "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
                 logger.warning("Invalid or missing HuggingFace token. Diarization will be skipped.")
-                logger.info("Please set a valid HF_TOKEN in backend/configs/config.yaml or as environment variable.")
+                logger.info("Please set a valid HF_TOKEN in backend/configs/.env file.")
                 logger.info("Get your token from: https://huggingface.co/settings/tokens")
             else:
+                logger.info(f"Using HuggingFace token for diarization: {hf_token[:10]}...")
                 result, elapsed_time_diarization = self.diarizer.run(
                     audio=origin_audio,
                     use_auth_token=hf_token,
                     transcribed_result=result,
                     device=diarization_params.diarization_device
                 )
+                logger.info(f"Diarization completed in {elapsed_time_diarization:.2f} seconds")
             if diarization_params.enable_offload:
                 self.diarizer.offload()
 

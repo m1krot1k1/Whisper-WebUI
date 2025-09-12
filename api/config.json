@@ -1,0 +1,28 @@
+{
+    "database": {
+        "path": "/var/www/record.danila-master.ru/db/database.sqlite"
+    },
+    "directories": {
+        "record": "/var/www/record.danila-master.ru/record",
+        "record_megafon": "/var/www/record.danila-master.ru/record_megafon",
+        "transcript": "/var/www/record.danila-master.ru/transcript/download"
+    },
+    "api": {
+        "url": "http://192.168.111.34:8000",
+        "username": "@dmin4",
+        "password": "b#*4#3xT0B3*Rn4g"
+    },
+    "processing": {
+        "sleep_interval": 60,
+        "batch_size": 1,
+        "max_retries": 3
+    },
+    "transcription": {
+        "model": "large-v3",
+        "language": "russian",
+        "enable_diarization": true,
+        "enable_vad_filter": true,
+        "file_format": "SRT",
+        "add_timestamp": true
+    }
+}
